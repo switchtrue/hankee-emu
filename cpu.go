@@ -2,6 +2,15 @@ package main
 
 import "fmt"
 
+// 7 6 5 4 3 2 1 0
+// N V _ B D I Z C
+// | |   | | | | +--- Carry Flag
+// | |   | | | +----- Zero Flag
+// | |   | | +------- Interrupt Disable
+// | |   | +--------- Decimal Mode (not used on NES)
+// | |   +----------- Break Command
+// | +--------------- Overflow Flag
+// +----------------- Negative Flag
 type CPU struct {
 	registerA      uint8
 	registerX      uint8
@@ -22,6 +31,101 @@ func NewCPU() *CPU {
 	}
 }
 
+// BRK - Force Interrupt
+// The BRK instruction forces the generation of an interrupt request. The program
+// counter and processor status are pushed on the stack then the IRQ interrupt
+// vector at $FFFE/F is loaded into the PC and the break flag in the status set
+// to one.
+func (cpu *CPU) brk() {}
+
+// CLC - Clear Carry Flag
+// Set the carry flag to zero.
+func (cpu *CPU) clc() {
+	cpu.status &= uint8(0b0000_0001)
+}
+
+// CLD - Clear Decimal Mode
+// Sets the decimal mode flag to zero.
+func (cpu *CPU) cld() {
+	cpu.status &= uint8(0b0000_1000)
+}
+
+// CLI - Clear Interrupt Disable
+// Clears the interrupt disable flag allowing normal interrupt requests to be serviced.
+func (cpu *CPU) cli() {
+	cpu.status &= uint8(0b0000_0100)
+}
+
+// CLV - Clear Overflow Flag
+// Clears the overflow flag.
+func (cpu *CPU) clv() {
+	cpu.status &= uint8(0b0100_0000)
+}
+
+// CMP - Compare
+// This instruction compares the contents of the accumulator with another memory held value
+// and sets the zero and carry flags as appropriate.
+func (cpu *CPU) cmp(mode AddressingMode) {
+	addr := cpu.getOperandAddress(mode)
+	value := cpu.memRead(addr)
+	delta := cpu.registerA - value
+	if cpu.registerA > value {
+		cpu.status |= uint8(0b0000_0001)
+	}
+	cpu.updateZeroAndNegativeFlags(delta)
+}
+
+// CPX - Compare X Register
+// This instruction compares the contents of the X register with another memory held value
+// and sets the zero and carry flags as appropriate.
+func (cpu *CPU) cpx(mode AddressingMode) {
+	addr := cpu.getOperandAddress(mode)
+	value := cpu.memRead(addr)
+	delta := cpu.registerX - value
+	if cpu.registerX > value {
+		cpu.status |= uint8(0b0000_0001)
+	}
+	cpu.updateZeroAndNegativeFlags(delta)
+}
+
+// CPY - Compare Y Register
+// This instruction compares the contents of the Y register with another memory held value
+// and sets the zero and carry flags as appropriate.
+func (cpu *CPU) cpy(mode AddressingMode) {
+	addr := cpu.getOperandAddress(mode)
+	value := cpu.memRead(addr)
+	delta := cpu.registerY - value
+	if cpu.registerY > value {
+		cpu.status |= uint8(0b0000_0001)
+	}
+	cpu.updateZeroAndNegativeFlags(delta)
+}
+
+// INC - Increment Memory
+// Adds one to the value held at a specified memory location setting the zero and negative
+// flags as appropriate.
+func (cpu *CPU) inc(mode AddressingMode) {
+	addr := cpu.getOperandAddress(mode)
+	value := cpu.memRead(addr)
+	value = value + uint8(1)
+	cpu.memWrite(addr, value)
+	cpu.updateZeroAndNegativeFlags(value)
+}
+
+// INX - Increment X Register
+// Adds one to the X register setting the zero and negative flags as appropriate.
+func (cpu *CPU) inx() {
+	cpu.registerX += uint8(1)
+	cpu.updateZeroAndNegativeFlags(cpu.registerX)
+}
+
+// INY - Increment Y Register
+// Adds one to the Y register setting the zero and negative flags as appropriate.
+func (cpu *CPU) iny() {
+	cpu.registerY += uint8(1)
+	cpu.updateZeroAndNegativeFlags(cpu.registerY)
+}
+
 // LDA - Load Accumulator
 // Loads a byte of memory into the accumulator setting the zero and negative flags
 // as appropriate.
@@ -32,20 +136,28 @@ func (cpu *CPU) lda(mode AddressingMode) {
 	cpu.updateZeroAndNegativeFlags(cpu.registerA)
 }
 
-// TAX - Transfer Accumulator to X
-// Copies the current contents of the accumulator into the X register and sets
-// the zero and negative flags as appropriate.
-func (cpu *CPU) tax() {
-	cpu.registerX = cpu.registerA
+// LDX - Load X Register
+// Loads a byte of memory into the X register setting the zero and negative flags as appropriate.
+func (cpu *CPU) ldx(mode AddressingMode) {
+	addr := cpu.getOperandAddress(mode)
+	value := cpu.memRead(addr)
+	cpu.registerX = value
 	cpu.updateZeroAndNegativeFlags(cpu.registerX)
 }
 
-// INX - Increment X Register
-// Adds one to the X register setting the zero and negative flags as appropriate.
-func (cpu *CPU) inx() {
-	cpu.registerX += uint8(1)
-	cpu.updateZeroAndNegativeFlags(cpu.registerX)
+// LDX - Load Y Register
+// Loads a byte of memory into the Y register setting the zero and negative flags as appropriate.
+func (cpu *CPU) ldy(mode AddressingMode) {
+	addr := cpu.getOperandAddress(mode)
+	value := cpu.memRead(addr)
+	cpu.registerY = value
+	cpu.updateZeroAndNegativeFlags(cpu.registerY)
 }
+
+// NOP - No Operation
+// The NOP instruction causes no changes to the processor other than the normal
+// incrementing of the program counter to the next instruction.
+func (cpu *CPU) nop() {}
 
 // STA - Store Accumulator
 // Stores the contents of the accumulator into memory.
@@ -54,17 +166,35 @@ func (cpu *CPU) sta(mode AddressingMode) {
 	cpu.memWrite(addr, cpu.registerA)
 }
 
-// NOP - No Operation
-// The NOP instruction causes no changes to the processor other than the normal
-// incrementing of the program counter to the next instruction.
-func (cpu *CPU) nop() {}
+// STX - Store X Register
+// Stores the contents of the X register into memory.
+func (cpu *CPU) stx(mode AddressingMode) {
+	addr := cpu.getOperandAddress(mode)
+	cpu.memWrite(addr, cpu.registerX)
+}
 
-// BRK - Force Interrupt
-// The BRK instruction forces the generation of an interrupt request. The program
-// counter and processor status are pushed on the stack then the IRQ interrupt
-// vector at $FFFE/F is loaded into the PC and the break flag in the status set
-// to one.
-func (cpu *CPU) brk() {}
+// STY - Store Y Register
+// Stores the contents of the Y register into memory.
+func (cpu *CPU) sty(mode AddressingMode) {
+	addr := cpu.getOperandAddress(mode)
+	cpu.memWrite(addr, cpu.registerY)
+}
+
+// TAX - Transfer Accumulator to X
+// Copies the current contents of the accumulator into the X register and sets
+// the zero and negative flags as appropriate.
+func (cpu *CPU) tax() {
+	cpu.registerX = cpu.registerA
+	cpu.updateZeroAndNegativeFlags(cpu.registerX)
+}
+
+// TAY - Transfer Accumulator to Y
+// Copies the current contents of the accumulator into the Y register and sets
+// the zero and negative flags as appropriate.
+func (cpu *CPU) tay() {
+	cpu.registerY = cpu.registerA
+	cpu.updateZeroAndNegativeFlags(cpu.registerY)
+}
 
 func (cpu *CPU) updateZeroAndNegativeFlags(result uint8) {
 	// If the register is zero set the zero flag
@@ -171,28 +301,73 @@ func (cpu *CPU) run() {
 		cpu.programCounter++
 		programCounterState := cpu.programCounter
 
-		opcode := CPU_OPS_CODES[code]
+		opcode, ok := CPU_OP_CODE_TABLE[code]
+		if !ok {
+			panic(fmt.Sprintf("Could not locate opcode in opcode table: 0x%x\n", code))
+		}
 
 		switch code {
-		// LDA
-		case 0xA9, 0xA5, 0xB5, 0xAD, 0xBD, 0xB9, 0xA1, 0xB1:
-			cpu.lda(opcode.AddressingMode)
-		// STA
-		case 0x85, 0x95, 0x8D, 0x9D, 0x99, 0x81, 0x91:
-			cpu.sta(IndirectY)
-		// TAX
-		case 0xAA:
-			cpu.tax()
-		// INX
-		case 0xE8:
-			cpu.inx()
-		// NOP
-		case 0xEA:
-			cpu.nop()
 		// BRK
 		case 0x00:
 			cpu.brk()
 			return
+		// CLC
+		case 0x18:
+			cpu.clc()
+		// CLD
+		case 0xD8:
+			cpu.cld()
+		// CLI
+		case 0x58:
+			cpu.cli()
+		// CLV
+		case 0xB8:
+			cpu.clv()
+		// CMP
+		case 0xC9, 0xC5, 0xD5, 0xCD, 0xDD, 0xD9, 0xC1, 0xD1:
+			cpu.cmp(opcode.AddressingMode)
+		// CPX
+		case 0xE0, 0xE4, 0xEC:
+			cpu.cpx(opcode.AddressingMode)
+		// CPY
+		case 0xC0, 0xC4, 0xCC:
+			cpu.cpy(opcode.AddressingMode)
+		// INC
+		case 0xE6, 0xF6, 0xEE, 0xFE:
+			cpu.inc(opcode.AddressingMode)
+		// INX
+		case 0xE8:
+			cpu.inx()
+		// INY
+		case 0xC8:
+			cpu.iny()
+		// LDA
+		case 0xA9, 0xA5, 0xB5, 0xAD, 0xBD, 0xB9, 0xA1, 0xB1:
+			cpu.lda(opcode.AddressingMode)
+		// LDX
+		case 0xA2, 0xA6, 0xB6, 0xAE, 0xBE:
+			cpu.ldx(opcode.AddressingMode)
+		// LDY
+		case 0xA0, 0xA4, 0xB4, 0xAC, 0xBC:
+			cpu.ldy(opcode.AddressingMode)
+		// NOP
+		case 0xEA:
+			cpu.nop()
+		// STA
+		case 0x85, 0x95, 0x8D, 0x9D, 0x99, 0x81, 0x91:
+			cpu.sta(opcode.AddressingMode)
+		// STX
+		case 0x86, 0x96, 0x8E:
+			cpu.stx(opcode.AddressingMode)
+		// STY
+		case 0x84, 0x94, 0x8C:
+			cpu.sty(opcode.AddressingMode)
+		// TAX
+		case 0xAA:
+			cpu.tax()
+		// TAY
+		case 0xA8:
+			cpu.tay()
 		default:
 			panic(fmt.Sprintf("Unsupported opcode: 0x%x\n", opcode))
 		}
