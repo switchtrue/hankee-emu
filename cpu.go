@@ -8,6 +8,7 @@ type CPU struct {
 	registerY      uint8
 	status         uint8
 	programCounter uint16
+	stackPointer   uint8
 	memory         []uint8
 }
 
@@ -18,6 +19,7 @@ func NewCPU() *CPU {
 		registerY:      0,
 		status:         0,
 		programCounter: 0,
+		stackPointer:   STACK_RESET,
 		memory:         make([]uint8, 0xFFFF),
 	}
 }
@@ -268,7 +270,9 @@ func (cpu *CPU) jmp(mode AddressingMode) {
 // The JSR instruction pushes the address (minus one) of the return point on to
 // the stack and then sets the program counter to the target memory address.
 func (cpu *CPU) jsr() {
-	panic("OpCode not implemented")
+	cpu.stackPushUInt16(cpu.programCounter + 2 - 1)
+	addr := cpu.memReadUInt16(cpu.programCounter)
+	cpu.programCounter = addr
 }
 
 // LDA - Load Accumulator
@@ -330,27 +334,28 @@ func (cpu *CPU) ora(mode AddressingMode) {
 // PHA - Push Accumulator
 // Pushes a copy of the accumulator on to the stack.
 func (cpu *CPU) pha() {
-	panic("OpCode not implemented")
+	cpu.stackPush(cpu.registerA)
 }
 
 // PHP - Push Processor Status
 // Pushes a copy of the status flags on to the stack.
 func (cpu *CPU) php() {
-	panic("OpCode not implemented")
+	cpu.stackPush(cpu.status)
 }
 
 // PLA - Pull Accumulator
 // Pulls an 8 bit value from the stack and into the accumulator. The zero and
 // negative flags are set as appropriate.
 func (cpu *CPU) pla() {
-	panic("OpCode not implemented")
+	cpu.registerA = cpu.stackPop()
+	cpu.setFlagNegativeForResult(cpu.registerA)
 }
 
 // PLP - Pull Processor Status
 // Pulls an 8 bit value from the stack and into the processor flags. The flags
 // will take on new states as determined by the value pulled.
 func (cpu *CPU) plp() {
-	panic("OpCode not implemented")
+	cpu.status = cpu.stackPop()
 }
 
 // ROL - Rotate Left
@@ -373,14 +378,15 @@ func (cpu *CPU) ror(mode AddressingMode) {
 // The RTI instruction is used at the end of an interrupt processing routine.
 // It pulls the processor flags from the stack followed by the program counter.
 func (cpu *CPU) rti() {
-	panic("OpCode not implemented")
+	cpu.status = cpu.stackPop()
+	cpu.programCounter = cpu.stackPopUInt16()
 }
 
 // RTS - Return from Subroutine
 // The RTS instruction is used at the end of a subroutine to return to the
 // calling routine. It pulls the program counter (minus one) from the stack.
 func (cpu *CPU) rts() {
-	panic("OpCode not implemented")
+	cpu.programCounter = cpu.stackPopUInt16() + 1
 }
 
 // SBC - Subtract with Carry
@@ -390,8 +396,7 @@ func (cpu *CPU) rts() {
 func (cpu *CPU) sbc(mode AddressingMode) {
 	addr := cpu.getOperandAddress(mode)
 	value := cpu.memRead(addr)
-	cpu.addToRegisterA(value - uint8(1))
-	panic("OpCode not implemented")
+	cpu.addToRegisterA(-value - uint8(1))
 }
 
 // SEC - Set Carry Flag
@@ -453,7 +458,8 @@ func (cpu *CPU) tay() {
 // Copies the current contents of the stack register into the X register and
 // sets the zero and negative flags as appropriate.
 func (cpu *CPU) tsx() {
-	panic("OpCode not implemented")
+	cpu.registerX = cpu.stackPop()
+	cpu.setFlagZeroAndNegativeForResult(cpu.registerX)
 }
 
 // TXA - Transfer X to Accumulator
@@ -467,7 +473,7 @@ func (cpu *CPU) txa() {
 // TXS - Transfer X to Stack Pointer
 // Copies the current contents of the X register into the stack register.
 func (cpu *CPU) txs() {
-	panic("OpCode not implemented")
+	cpu.stackPush(cpu.registerX)
 }
 
 // TYA - Transfer Y to Accumulator
