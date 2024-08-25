@@ -219,13 +219,13 @@ var CPU_OP_CODE_TABLE = map[uint8]OpCode{
 	0x96: {0x96, "STX", ZeroPageY, 2, 4},
 	0x8E: {0x8E, "STX", Absolute, 3, 4},
 	// STY
-	0x84: {0x84, "STX", ZeroPage, 2, 3},
-	0x94: {0x94, "STX", ZeroPageX, 2, 4},
-	0x8C: {0x8C, "STX", Absolute, 3, 4},
+	0x84: {0x84, "STY", ZeroPage, 2, 3},
+	0x94: {0x94, "STY", ZeroPageX, 2, 4},
+	0x8C: {0x8C, "STY", Absolute, 3, 4},
 	// TAX
 	0xAA: {0xAA, "TAX", Implied, 1, 2},
 	// TAY
-	0xA8: {0xA8, "TAX", Implied, 1, 2},
+	0xA8: {0xA8, "TAY", Implied, 1, 2},
 	// TSX
 	0xBA: {0xBA, "TSX", Implied, 1, 2},
 	// TXA
