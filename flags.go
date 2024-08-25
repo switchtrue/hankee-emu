@@ -31,9 +31,23 @@ func (cpu *CPU) setFlag(flag Flag, isSet bool) {
 	cpu.status &= 0xFF - flag
 }
 
+// Generic method to get any flag balue as a boolean
+func (cpu *CPU) getFlag(flag Flag) bool {
+	return cpu.status&flag != 0
+}
+
+func (cpu *CPU) setFlagZero(isSet bool) {
+	cpu.setFlag(FlagZero, isSet)
+}
+
 // Set the Zero Flag based on the result of an operation
 func (cpu *CPU) setFlagZeroForResult(result uint8) {
 	cpu.setFlag(FlagZero, result == 0)
+}
+
+// Gets the Zero flag as a boolean
+func (cpu *CPU) getFlagZero() bool {
+	return cpu.getFlag(FlagZero)
 }
 
 // Sets the Interrupt Disable flag to 1 or 0
@@ -53,7 +67,7 @@ func (cpu *CPU) setFlagCarry(isSet bool) {
 
 // Gets the carry flag as a boolean
 func (cpu *CPU) getFlagCarry() bool {
-	return cpu.status&FlagCarry != 0
+	return cpu.getFlag(FlagCarry)
 }
 
 // Sets the Carry flag based on the result of an operation
@@ -71,9 +85,23 @@ func (cpu *CPU) setFlagOverflow(isSet bool) {
 	cpu.setFlag(FlagOverflow, isSet)
 }
 
+// Gets the Overflow flag as a boolean
+func (cpu *CPU) getFlagOverflow() bool {
+	return cpu.getFlag(FlagOverflow)
+}
+
+func (cpu *CPU) setFlagNegative(isSet bool) {
+	cpu.setFlag(FlagNegative, isSet)
+}
+
 // Sets the Negative flag base on the result of an operation
 func (cpu *CPU) setFlagNegativeForResult(result uint8) {
 	cpu.setFlag(FlagNegative, result&0b1000_0000 != 0)
+}
+
+// Gets the Negative flag as a boolean
+func (cpu *CPU) getFlagNegative() bool {
+	return cpu.getFlag(FlagNegative)
 }
 
 // Sets both the Zero and Negative flags based on the result of an operation.

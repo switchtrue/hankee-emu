@@ -29,19 +29,7 @@ func NewCPU() *CPU {
 func (cpu *CPU) adc(mode AddressingMode) {
 	addr := cpu.getOperandAddress(mode)
 	value := cpu.memRead(addr)
-
-	sum := cpu.registerA + value
-	if cpu.getFlagCarry() {
-		sum += 1
-	}
-
-	overflow := (cpu.registerA^value)&0x80 == 0 && (cpu.registerA^sum)&0x80 != 0
-
-	cpu.registerA += sum
-
-	cpu.setFlagOverflow(overflow)
-	cpu.setFlagCarryForResult(cpu.registerA)
-	cpu.setFlagZeroAndNegativeForResult(cpu.registerA)
+	cpu.addToRegisterA(value)
 }
 
 // AND - Logical AND
@@ -62,28 +50,29 @@ func (cpu *CPU) and(mode AddressingMode) {
 // complement considerations), setting the carry if the result will not fit in
 // 8 bits.
 func (cpu *CPU) asl(mode AddressingMode) {
-	panic("OpCode not implemented")
+	cpu.setFlagCarry(cpu.registerA>>7 == 1)
+	cpu.registerA = cpu.registerA << 1
 }
 
 // BCC - Branch if Carry Clear
 // If the carry flag is clear then add the relative displacement to the program
 // counter to cause a branch to a new location.
 func (cpu *CPU) bcc() {
-	panic("OpCode not implemented")
+	cpu.branch(!cpu.getFlagCarry())
 }
 
 // BCS - Branch if Carry Set
 // If the carry flag is set then add the relative displacement to the program
 // counter to cause a branch to a new location.
 func (cpu *CPU) bcs() {
-	panic("OpCode not implemented")
+	cpu.branch(cpu.getFlagCarry())
 }
 
 // BEQ - Branch if Equal
 // If the zero flag is set then add the relative displacement to the program
 // counter to cause a branch to a new location.
 func (cpu *CPU) beq() {
-	panic("OpCode not implemented")
+	cpu.branch(!cpu.getFlagZero())
 }
 
 // BIT - Bit Test
@@ -92,28 +81,33 @@ func (cpu *CPU) beq() {
 // set or clear the zero flag, but the result is not kept. Bits 7 and 6 of the
 // value from memory are copied into the N and V flags.
 func (cpu *CPU) bit(mode AddressingMode) {
-	panic("OpCode not implemented")
+	addr := cpu.getOperandAddress(mode)
+	value := cpu.memRead(addr)
+	anded := cpu.registerA & value
+	cpu.setFlagZero(anded == 0)
+	cpu.setFlagNegative(value&0b10000000 > 0)
+	cpu.setFlagOverflow(value&0b01000000 > 0)
 }
 
 // BMI - Branch if Minus
 // If the negative flag is set then add the relative displacement to the program
 // counter to cause a branch to a new location.
 func (cpu *CPU) bmi() {
-	panic("OpCode not implemented")
+	cpu.branch(cpu.getFlagNegative())
 }
 
 // BNE - Branch if Not Equal
 // If the zero flag is clear then add the relative displacement to the program
 // counter to cause a branch to a new location.
 func (cpu *CPU) bne() {
-	panic("OpCode not implemented")
+	cpu.branch(!cpu.getFlagZero())
 }
 
 // BPL - Branch if Positive
 // If the negative flag is clear then add the relative displacement to the
 // program counter to cause a branch to a new location.
 func (cpu *CPU) bpl() {
-	panic("OpCode not implemented")
+	cpu.branch(!cpu.getFlagNegative())
 }
 
 // BRK - Force Interrupt
@@ -127,14 +121,14 @@ func (cpu *CPU) brk() {}
 // If the overflow flag is clear then add the relative displacement to the
 // program counter to cause a branch to a new location.
 func (cpu *CPU) bvc() {
-	panic("OpCode not implemented")
+	cpu.branch(!cpu.getFlagOverflow())
 }
 
 // BVS - Branch if Overflow Set
 // If the overflow flag is set then add the relative displacement to the program
 // counter to cause a branch to a new location.
 func (cpu *CPU) bvs() {
-	panic("OpCode not implemented")
+	cpu.branch(cpu.getFlagOverflow())
 }
 
 // CLC - Clear Carry Flag
@@ -205,28 +199,36 @@ func (cpu *CPU) cpy(mode AddressingMode) {
 // Subtracts one from the value held at a specified memory location setting the
 // zero and negative flags as appropriate.
 func (cpu *CPU) dec(mode AddressingMode) {
-	panic("OpCode not implemented")
+	addr := cpu.getOperandAddress(mode)
+	value := cpu.memRead(addr)
+	value = value - uint8(1)
+	cpu.memWrite(addr, value)
+	cpu.setFlagZeroAndNegativeForResult(value)
 }
 
 // DEX - Decrement X Register
 // Subtracts one from the X register setting the zero and negative flags as
 // appropriate.
 func (cpu *CPU) dex(mode AddressingMode) {
-	panic("OpCode not implemented")
+	cpu.registerX -= uint8(1)
+	cpu.setFlagZeroAndNegativeForResult(cpu.registerX)
 }
 
 // DEY - Decrement Y Register
 // Subtracts one from the Y register setting the zero and negative flags as
 // appropriate.
 func (cpu *CPU) dey(mode AddressingMode) {
-	panic("OpCode not implemented")
+	cpu.registerY -= uint8(1)
+	cpu.setFlagZeroAndNegativeForResult(cpu.registerY)
 }
 
 // EOR - Exclusive OR
 // An exclusive OR is performed, bit by bit, on the accumulator contents using
 // the contents of a byte of memory.
 func (cpu *CPU) eor(mode AddressingMode) {
-	panic("OpCode not implemented")
+	addr := cpu.getOperandAddress(mode)
+	value := cpu.memRead(addr)
+	cpu.registerA ^= value
 }
 
 // INC - Increment Memory
@@ -257,7 +259,9 @@ func (cpu *CPU) iny() {
 // JMP - Jump
 // Sets the program counter to the address specified by the operand.
 func (cpu *CPU) jmp(mode AddressingMode) {
-	panic("OpCode not implemented")
+	addr := cpu.getOperandAddress(mode)
+	value := cpu.memReadUInt16(addr)
+	cpu.programCounter = value
 }
 
 // JSR - Jump to Subroutine
@@ -301,7 +305,12 @@ func (cpu *CPU) ldy(mode AddressingMode) {
 // Each of the bits in A or M is shift one place to the right. The bit that was
 // in bit 0 is shifted into the carry flag. Bit 7 is set to zero.
 func (cpu *CPU) lsr(mode AddressingMode) {
-	panic("OpCode not implemented")
+	addr := cpu.getOperandAddress(mode)
+	value := cpu.memRead(addr)
+	result := value >> 1
+	cpu.setFlagCarry(value&1 == 1)
+	cpu.memWrite(addr, result)
+	cpu.setFlagZeroAndNegativeForResult(result)
 }
 
 // NOP - No Operation
@@ -310,10 +319,12 @@ func (cpu *CPU) lsr(mode AddressingMode) {
 func (cpu *CPU) nop() {}
 
 // ORA - Logical Inclusive OR
-// // An inclusive OR is performed, bit by bit, on the accumulator contents
+// inclusive OR is performed, bit by bit, on the accumulator contents
 // using the contents of a byte of memory.
 func (cpu *CPU) ora(mode AddressingMode) {
-	panic("OpCode not implemented")
+	addr := cpu.getOperandAddress(mode)
+	value := cpu.memRead(addr)
+	cpu.registerA |= value
 }
 
 // PHA - Push Accumulator
@@ -377,6 +388,9 @@ func (cpu *CPU) rts() {
 // accumulator together with the not of the carry bit. If overflow occurs the
 // carry bit is clear, this enables multiple byte subtraction to be performed.
 func (cpu *CPU) sbc(mode AddressingMode) {
+	addr := cpu.getOperandAddress(mode)
+	value := cpu.memRead(addr)
+	cpu.addToRegisterA(value - uint8(1))
 	panic("OpCode not implemented")
 }
 
@@ -446,7 +460,8 @@ func (cpu *CPU) tsx() {
 // Copies the current contents of the X register into the accumulator and sets
 // the zero and negative flags as appropriate.
 func (cpu *CPU) txa() {
-	panic("OpCode not implemented")
+	cpu.registerA = cpu.registerX
+	cpu.setFlagZeroAndNegativeForResult(cpu.registerA)
 }
 
 // TXS - Transfer X to Stack Pointer
@@ -459,7 +474,8 @@ func (cpu *CPU) txs() {
 // Copies the current contents of the Y register into the accumulator and sets
 // the zero and negative flags as appropriate.
 func (cpu *CPU) tya() {
-	panic("OpCode not implemented")
+	cpu.registerA = cpu.registerY
+	cpu.setFlagZeroAndNegativeForResult(cpu.registerA)
 }
 
 func (cpu *CPU) getOperandAddress(mode AddressingMode) uint16 {
@@ -503,6 +519,29 @@ func (cpu *CPU) getOperandAddress(mode AddressingMode) uint16 {
 		panic(fmt.Sprintf("AddressingMode %x is not supported", mode))
 
 	}
+}
+
+func (cpu *CPU) branch(shouldBranch bool) {
+	if shouldBranch {
+		jump := cpu.memRead(cpu.programCounter)
+		jump_addr := cpu.programCounter + uint16(1) + uint16(jump)
+		cpu.programCounter = jump_addr
+	}
+}
+
+func (cpu *CPU) addToRegisterA(value uint8) {
+	sum := cpu.registerA + value
+	if cpu.getFlagCarry() {
+		sum += 1
+	}
+
+	overflow := (cpu.registerA^value)&0x80 == 0 && (cpu.registerA^sum)&0x80 != 0
+
+	cpu.registerA += sum
+
+	cpu.setFlagOverflow(overflow)
+	cpu.setFlagCarryForResult(cpu.registerA)
+	cpu.setFlagZeroAndNegativeForResult(cpu.registerA)
 }
 
 func (cpu *CPU) reset() {
