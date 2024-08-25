@@ -363,7 +363,28 @@ func (cpu *CPU) plp() {
 // with the current value of the carry flag whilst the old bit 7 becomes the
 // new carry flag value.
 func (cpu *CPU) rol(mode AddressingMode) {
-	panic("OpCode not implemented")
+	var value uint8
+	if mode == Accumulator {
+		value = cpu.registerA
+	} else {
+		addr := cpu.getOperandAddress(mode)
+		value = cpu.memRead(addr)
+	}
+
+	oldCarry := cpu.getFlagCarry()
+	cpu.setFlagCarry(value>>7 == 1)
+	result := value << 1
+	if oldCarry {
+		result = result | 1
+	}
+
+	if mode == Accumulator {
+		cpu.registerA = result
+	} else {
+		addr := cpu.getOperandAddress(mode)
+		cpu.memWrite(addr, result)
+		cpu.setFlagNegativeForResult(result)
+	}
 }
 
 // ROR - Rotate Right
@@ -371,7 +392,28 @@ func (cpu *CPU) rol(mode AddressingMode) {
 // filled with the current value of the carry flag whilst the old bit 0
 // becomes the new carry flag value.
 func (cpu *CPU) ror(mode AddressingMode) {
-	panic("OpCode not implemented")
+	var value uint8
+	if mode == Accumulator {
+		value = cpu.registerA
+	} else {
+		addr := cpu.getOperandAddress(mode)
+		value = cpu.memRead(addr)
+	}
+
+	oldCarry := cpu.getFlagCarry()
+	cpu.setFlagCarry(value&1 == 1)
+	result := value >> 1
+	if oldCarry {
+		result = result | 0b10000000
+	}
+
+	if mode == Accumulator {
+		cpu.registerA = result
+	} else {
+		addr := cpu.getOperandAddress(mode)
+		cpu.memWrite(addr, result)
+		cpu.setFlagNegativeForResult(result)
+	}
 }
 
 // RTI - Return from Interrupt
