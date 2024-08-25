@@ -12,6 +12,7 @@ const (
 	AbsoluteY
 	IndirectX
 	IndirectY
+	Relative
 	NoneAddressing
 )
 

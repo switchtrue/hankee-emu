@@ -21,6 +21,7 @@ const (
 	FlagNegative             = 1 << 7
 )
 
+// Generic method to set any flag to 1 or 0
 func (cpu *CPU) setFlag(flag Flag, isSet bool) {
 	if isSet {
 		cpu.status |= flag
@@ -30,42 +31,54 @@ func (cpu *CPU) setFlag(flag Flag, isSet bool) {
 	cpu.status &= 0xFF - flag
 }
 
+// Set the Zero Flag based on the result of an operation
 func (cpu *CPU) setFlagZeroForResult(result uint8) {
 	cpu.setFlag(FlagZero, result == 0)
 }
 
+// Sets the Interrupt Disable flag to 1 or 0
 func (cpu *CPU) setFlagInterruptDisable(isSet bool) {
 	cpu.setFlag(FlagInterruptDiable, isSet)
 }
 
+// Sets the Decimal Mode flag to 1 or 0
 func (cpu *CPU) setFlagDecimalMode(isSet bool) {
 	cpu.setFlag(FlagDecimalMode, isSet)
 }
 
+// Sets the carry flag to 1 or 0
 func (cpu *CPU) setFlagCarry(isSet bool) {
 	cpu.setFlag(FlagCarry, isSet)
 }
 
+// Gets the carry flag as a boolean
 func (cpu *CPU) getFlagCarry() bool {
 	return cpu.status&FlagCarry != 0
 }
 
+// Sets the Carry flag based on the result of an operation
 func (cpu *CPU) setFlagCarryForResult(result uint8) {
 	cpu.setFlag(FlagCarry, result > 0xff)
 }
 
+// Sets the Break Command flag to 1 or 0
 func (cpu *CPU) setFlagBreakCommand(isSet bool) {
 	cpu.setFlag(FlagBreakCommand, isSet)
 }
 
+// Sets the Overflow flag to 1 or 0
 func (cpu *CPU) setFlagOverflow(isSet bool) {
 	cpu.setFlag(FlagOverflow, isSet)
 }
 
+// Sets the Negative flag base on the result of an operation
 func (cpu *CPU) setFlagNegativeForResult(result uint8) {
 	cpu.setFlag(FlagNegative, result&0b1000_0000 != 0)
 }
 
+// Sets both the Zero and Negative flags based on the result of an operation.
+// This is a convenience functions that sets both in one go as they are
+// frequently set together
 func (cpu *CPU) setFlagZeroAndNegativeForResult(result uint8) {
 	cpu.setFlagZeroForResult(result)
 	cpu.setFlagNegativeForResult(result)
