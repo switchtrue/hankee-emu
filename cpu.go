@@ -1,6 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 type CPU struct {
 	registerA      uint8
@@ -606,140 +609,163 @@ func (cpu *CPU) loadAndRun(program []uint8) {
 	cpu.run()
 }
 
+func (cpu *CPU) loadAndRunWithCallback(program []uint8, callback func(cpu *CPU)) {
+	cpu.load(program)
+	fmt.Println(program)
+	cpu.reset()
+	cpu.runWithCallback(callback)
+}
+
 func (cpu *CPU) load(program []uint8) {
 	copy(cpu.memory[0x8000:0x8000+len(program)], program[:])
 	cpu.memWriteUInt16(0xFFFC, 0x8000)
+	// copy(cpu.memory[0x0600:0x0600+len(program)], program[:])
+	// cpu.memWriteUInt16(0xFFFC, 0x0600)
 }
 
 func (cpu *CPU) run() {
+	cpu.runWithCallback(func(cpu *CPU) {})
+}
+
+func (cpu *CPU) runWithCallback(callback func(cpu *CPU)) {
 	for {
-		code := cpu.memRead(uint16(cpu.programCounter))
-		cpu.programCounter++
-		programCounterState := cpu.programCounter
-
-		opcode, ok := CPU_OP_CODE_TABLE[code]
-		if !ok {
-			panic(fmt.Sprintf("Could not locate opcode in opcode table: 0x%x\n", code))
-		}
-
-		switch opcode.Name {
-		case "ADC":
-			cpu.adc(opcode.AddressingMode)
-		case "AND":
-			cpu.and(opcode.AddressingMode)
-		case "ASL":
-			cpu.asl(opcode.AddressingMode)
-		case "BCC":
-			cpu.bcc()
-		case "BCS":
-			cpu.bcs()
-		case "BEQ":
-			cpu.beq()
-		case "BIT":
-			cpu.bit(opcode.AddressingMode)
-		case "BMI":
-			cpu.bmi()
-		case "BNE":
-			cpu.bne()
-		case "BPL":
-			cpu.bpl()
-		case "BRK":
-			cpu.brk()
+		err := cpu.tickWithCallback(callback)
+		if err != nil {
 			return
-		case "BVC":
-			cpu.bvc()
-		case "BVS":
-			cpu.bvs()
-		case "CLC":
-			cpu.clc()
-		case "CLD":
-			cpu.cld()
-		case "CLI":
-			cpu.cli()
-		case "CLV":
-			cpu.clv()
-		case "CMP":
-			cpu.cmp(opcode.AddressingMode)
-		case "CPX":
-			cpu.cpx(opcode.AddressingMode)
-		case "CPY":
-			cpu.cpy(opcode.AddressingMode)
-		case "DEC":
-			cpu.dec(opcode.AddressingMode)
-		case "DEX":
-			cpu.dex(opcode.AddressingMode)
-		case "DEY":
-			cpu.dey(opcode.AddressingMode)
-		case "EOR":
-			cpu.eor(opcode.AddressingMode)
-		case "INC":
-			cpu.inc(opcode.AddressingMode)
-		case "INX":
-			cpu.inx()
-		case "INY":
-			cpu.iny()
-		case "JMP":
-			cpu.jmp(opcode.AddressingMode)
-		case "JSR":
-			cpu.jsr()
-		case "LDA":
-			cpu.lda(opcode.AddressingMode)
-		case "LDX":
-			cpu.ldx(opcode.AddressingMode)
-		case "LDY":
-			cpu.ldy(opcode.AddressingMode)
-		case "NOP":
-			cpu.nop()
-		case "ORA":
-			cpu.ora(opcode.AddressingMode)
-		case "PHA":
-			cpu.pha()
-		case "PHP":
-			cpu.php()
-		case "PLA":
-			cpu.pla()
-		case "PLP":
-			cpu.plp()
-		case "ROL":
-			cpu.rol(opcode.AddressingMode)
-		case "ROR":
-			cpu.ror(opcode.AddressingMode)
-		case "RTI":
-			cpu.rti()
-		case "RTS":
-			cpu.rts()
-		case "SBC":
-			cpu.sbc(opcode.AddressingMode)
-		case "SEC":
-			cpu.sec()
-		case "SED":
-			cpu.sed()
-		case "SEI":
-			cpu.sei()
-		case "STA":
-			cpu.sta(opcode.AddressingMode)
-		case "STX":
-			cpu.stx(opcode.AddressingMode)
-		case "STY":
-			cpu.sty(opcode.AddressingMode)
-		case "TAX":
-			cpu.tax()
-		case "TAY":
-			cpu.tay()
-		case "TSX":
-			cpu.tsx()
-		case "TXA":
-			cpu.txa()
-		case "TXS":
-			cpu.txs()
-		case "TYA":
-			cpu.tya()
-		default:
-			panic(fmt.Sprintf("Unsupported opcode: 0x%x\n", opcode))
-		}
-
-		if programCounterState == cpu.programCounter {
-			cpu.programCounter += uint16(opcode.Bytes) - 1
 		}
 	}
+}
+
+func (cpu *CPU) tickWithCallback(callback func(cpu *CPU)) error {
+	callback(cpu)
+	code := cpu.memRead(uint16(cpu.programCounter))
+	cpu.programCounter++
+	programCounterState := cpu.programCounter
+
+	opcode, ok := CPU_OP_CODE_TABLE[code]
+	if !ok {
+		panic(fmt.Sprintf("Could not locate opcode in opcode table: 0x%x\n", code))
+	}
+
+	switch opcode.Name {
+	case "ADC":
+		cpu.adc(opcode.AddressingMode)
+	case "AND":
+		cpu.and(opcode.AddressingMode)
+	case "ASL":
+		cpu.asl(opcode.AddressingMode)
+	case "BCC":
+		cpu.bcc()
+	case "BCS":
+		cpu.bcs()
+	case "BEQ":
+		cpu.beq()
+	case "BIT":
+		cpu.bit(opcode.AddressingMode)
+	case "BMI":
+		cpu.bmi()
+	case "BNE":
+		cpu.bne()
+	case "BPL":
+		cpu.bpl()
+	case "BRK":
+		cpu.brk()
+		return errors.New("BRK.")
+	case "BVC":
+		cpu.bvc()
+	case "BVS":
+		cpu.bvs()
+	case "CLC":
+		cpu.clc()
+	case "CLD":
+		cpu.cld()
+	case "CLI":
+		cpu.cli()
+	case "CLV":
+		cpu.clv()
+	case "CMP":
+		cpu.cmp(opcode.AddressingMode)
+	case "CPX":
+		cpu.cpx(opcode.AddressingMode)
+	case "CPY":
+		cpu.cpy(opcode.AddressingMode)
+	case "DEC":
+		cpu.dec(opcode.AddressingMode)
+	case "DEX":
+		cpu.dex(opcode.AddressingMode)
+	case "DEY":
+		cpu.dey(opcode.AddressingMode)
+	case "EOR":
+		cpu.eor(opcode.AddressingMode)
+	case "INC":
+		cpu.inc(opcode.AddressingMode)
+	case "INX":
+		cpu.inx()
+	case "INY":
+		cpu.iny()
+	case "JMP":
+		cpu.jmp(opcode.AddressingMode)
+	case "JSR":
+		cpu.jsr()
+	case "LDA":
+		cpu.lda(opcode.AddressingMode)
+	case "LDX":
+		cpu.ldx(opcode.AddressingMode)
+	case "LDY":
+		cpu.ldy(opcode.AddressingMode)
+	case "NOP":
+		cpu.nop()
+	case "ORA":
+		cpu.ora(opcode.AddressingMode)
+	case "PHA":
+		cpu.pha()
+	case "PHP":
+		cpu.php()
+	case "PLA":
+		cpu.pla()
+	case "PLP":
+		cpu.plp()
+	case "ROL":
+		cpu.rol(opcode.AddressingMode)
+	case "ROR":
+		cpu.ror(opcode.AddressingMode)
+	case "RTI":
+		cpu.rti()
+	case "RTS":
+		cpu.rts()
+	case "SBC":
+		cpu.sbc(opcode.AddressingMode)
+	case "SEC":
+		cpu.sec()
+	case "SED":
+		cpu.sed()
+	case "SEI":
+		cpu.sei()
+	case "STA":
+		cpu.sta(opcode.AddressingMode)
+	case "STX":
+		cpu.stx(opcode.AddressingMode)
+	case "STY":
+		cpu.sty(opcode.AddressingMode)
+	case "TAX":
+		cpu.tax()
+	case "TAY":
+		cpu.tay()
+	case "TSX":
+		cpu.tsx()
+	case "TXA":
+		cpu.txa()
+	case "TXS":
+		cpu.txs()
+	case "TYA":
+		cpu.tya()
+	default:
+		panic(fmt.Sprintf("Unsupported opcode: 0x%x\n", opcode))
+	}
+
+	if programCounterState == cpu.programCounter {
+		cpu.programCounter += uint16(opcode.Bytes) - 1
+	}
+
+	return nil
 }
