@@ -61,7 +61,7 @@ func (cpu *CPU) and(mode AddressingMode) {
 // of this operation is to multiply the memory contents by 2 (ignoring 2's
 // complement considerations), setting the carry if the result will not fit in
 // 8 bits.
-func (cpu *CPU) asl() {
+func (cpu *CPU) asl(mode AddressingMode) {
 	panic("OpCode not implemented")
 }
 
@@ -536,73 +536,117 @@ func (cpu *CPU) run() {
 		}
 
 		switch opcode.Name {
-		// ADC
 		case "ADC":
 			cpu.adc(opcode.AddressingMode)
-		// AND
 		case "AND":
 			cpu.and(opcode.AddressingMode)
-		// BRK
+		case "ASL":
+			cpu.asl(opcode.AddressingMode)
+		case "BCC":
+			cpu.bcc()
+		case "BCS":
+			cpu.bcs()
+		case "BEQ":
+			cpu.beq()
+		case "BIT":
+			cpu.bit(opcode.AddressingMode)
+		case "BMI":
+			cpu.bmi()
+		case "BNE":
+			cpu.bne()
+		case "BPL":
+			cpu.bpl()
 		case "BRK":
 			cpu.brk()
 			return
-		// CLC
+		case "BVC":
+			cpu.bvc()
+		case "BVS":
+			cpu.bvs()
 		case "CLC":
 			cpu.clc()
-		// CLD
 		case "CLD":
 			cpu.cld()
-		// CLI
 		case "CLI":
 			cpu.cli()
-		// CLV
 		case "CLV":
 			cpu.clv()
-		// CMP
 		case "CMP":
 			cpu.cmp(opcode.AddressingMode)
-		// CPX
 		case "CPX":
 			cpu.cpx(opcode.AddressingMode)
-		// CPY
 		case "CPY":
 			cpu.cpy(opcode.AddressingMode)
-		// INC
+		case "DEC":
+			cpu.dec(opcode.AddressingMode)
+		case "DEX":
+			cpu.dex(opcode.AddressingMode)
+		case "DEY":
+			cpu.dey(opcode.AddressingMode)
+		case "EOR":
+			cpu.eor(opcode.AddressingMode)
 		case "INC":
 			cpu.inc(opcode.AddressingMode)
-		// INX
 		case "INX":
 			cpu.inx()
-		// INY
 		case "INY":
 			cpu.iny()
-		// LDA
+		case "JMP":
+			cpu.jmp(opcode.AddressingMode)
+		case "JSR":
+			cpu.jsr()
 		case "LDA":
 			cpu.lda(opcode.AddressingMode)
-		// LDX
 		case "LDX":
 			cpu.ldx(opcode.AddressingMode)
-		// LDY
 		case "LDY":
 			cpu.ldy(opcode.AddressingMode)
-		// NOP
 		case "NOP":
 			cpu.nop()
-		// STA
+		case "ORA":
+			cpu.ora(opcode.AddressingMode)
+		case "PHA":
+			cpu.pha()
+		case "PHP":
+			cpu.php()
+		case "PLA":
+			cpu.pla()
+		case "PLP":
+			cpu.plp()
+		case "ROL":
+			cpu.rol(opcode.AddressingMode)
+		case "ROR":
+			cpu.ror(opcode.AddressingMode)
+		case "RTI":
+			cpu.rti()
+		case "RTS":
+			cpu.rts()
+		case "SBC":
+			cpu.sbc(opcode.AddressingMode)
+		case "SEC":
+			cpu.sec()
+		case "SED":
+			cpu.sed()
+		case "SEI":
+			cpu.sei()
 		case "STA":
 			cpu.sta(opcode.AddressingMode)
-		// STX
 		case "STX":
 			cpu.stx(opcode.AddressingMode)
-		// STY
 		case "STY":
 			cpu.sty(opcode.AddressingMode)
-		// TAX
 		case "TAX":
 			cpu.tax()
-		// TAY
 		case "TAY":
 			cpu.tay()
+		case "TSX":
+			cpu.tsx()
+		case "TXA":
+			cpu.txa()
+		case "TXS":
+			cpu.txs()
+		case "TYA":
+			cpu.tya()
 		default:
 			panic(fmt.Sprintf("Unsupported opcode: 0x%x\n", opcode))
 		}
