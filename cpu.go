@@ -2,15 +2,6 @@ package main
 
 import "fmt"
 
-// 7 6 5 4 3 2 1 0
-// N V _ B D I Z C
-// | |   | | | | +--- Carry Flag
-// | |   | | | +----- Zero Flag
-// | |   | | +------- Interrupt Disable
-// | |   | +--------- Decimal Mode (not used on NES)
-// | |   +----------- Break Command
-// | +--------------- Overflow Flag
-// +----------------- Negative Flag
 type CPU struct {
 	registerA      uint8
 	registerX      uint8
@@ -31,6 +22,39 @@ func NewCPU() *CPU {
 	}
 }
 
+// ADC - Add with Carry
+// This instruction adds the contents of a memory location to the accumulator together
+// with the carry bit. If overflow occurs the carry bit is set, this enables multiple
+// byte addition to be performed.
+func (cpu *CPU) adc(mode AddressingMode) {
+	addr := cpu.getOperandAddress(mode)
+	value := cpu.memRead(addr)
+
+	sum := cpu.registerA + value
+	if cpu.getFlagCarry() {
+		sum += 1
+	}
+
+	overflow := (cpu.registerA^value)&0x80 == 0 && (cpu.registerA^sum)&0x80 != 0
+
+	cpu.registerA += sum
+
+	cpu.setFlagOverflow(overflow)
+	cpu.setFlagCarryForResult(cpu.registerA)
+	cpu.setFlagZeroAndNegativeForResult(cpu.registerA)
+}
+
+// AND - Logical AND
+// A logical AND is performed, bit by bit, on the accumulator contents using the contents
+// of a byte of memory.
+func (cpu *CPU) and(mode AddressingMode) {
+	addr := cpu.getOperandAddress(mode)
+	value := cpu.memRead(addr)
+
+	cpu.registerA &= value
+	cpu.setFlagZeroAndNegativeForResult(cpu.registerA)
+}
+
 // BRK - Force Interrupt
 // The BRK instruction forces the generation of an interrupt request. The program
 // counter and processor status are pushed on the stack then the IRQ interrupt
@@ -41,25 +65,25 @@ func (cpu *CPU) brk() {}
 // CLC - Clear Carry Flag
 // Set the carry flag to zero.
 func (cpu *CPU) clc() {
-	cpu.status &= uint8(0b0000_0001)
+	cpu.setFlagCarry(false)
 }
 
 // CLD - Clear Decimal Mode
 // Sets the decimal mode flag to zero.
 func (cpu *CPU) cld() {
-	cpu.status &= uint8(0b0000_1000)
+	cpu.setFlagDecimalMode(false)
 }
 
 // CLI - Clear Interrupt Disable
 // Clears the interrupt disable flag allowing normal interrupt requests to be serviced.
 func (cpu *CPU) cli() {
-	cpu.status &= uint8(0b0000_0100)
+	cpu.setFlagInterruptDisable(false)
 }
 
 // CLV - Clear Overflow Flag
 // Clears the overflow flag.
 func (cpu *CPU) clv() {
-	cpu.status &= uint8(0b0100_0000)
+	cpu.setFlagOverflow(false)
 }
 
 // CMP - Compare
@@ -72,7 +96,7 @@ func (cpu *CPU) cmp(mode AddressingMode) {
 	if cpu.registerA > value {
 		cpu.status |= uint8(0b0000_0001)
 	}
-	cpu.updateZeroAndNegativeFlags(delta)
+	cpu.setFlagZeroAndNegativeForResult(delta)
 }
 
 // CPX - Compare X Register
@@ -85,7 +109,7 @@ func (cpu *CPU) cpx(mode AddressingMode) {
 	if cpu.registerX > value {
 		cpu.status |= uint8(0b0000_0001)
 	}
-	cpu.updateZeroAndNegativeFlags(delta)
+	cpu.setFlagZeroAndNegativeForResult(delta)
 }
 
 // CPY - Compare Y Register
@@ -98,7 +122,7 @@ func (cpu *CPU) cpy(mode AddressingMode) {
 	if cpu.registerY > value {
 		cpu.status |= uint8(0b0000_0001)
 	}
-	cpu.updateZeroAndNegativeFlags(delta)
+	cpu.setFlagZeroAndNegativeForResult(delta)
 }
 
 // INC - Increment Memory
@@ -109,21 +133,21 @@ func (cpu *CPU) inc(mode AddressingMode) {
 	value := cpu.memRead(addr)
 	value = value + uint8(1)
 	cpu.memWrite(addr, value)
-	cpu.updateZeroAndNegativeFlags(value)
+	cpu.setFlagZeroAndNegativeForResult(value)
 }
 
 // INX - Increment X Register
 // Adds one to the X register setting the zero and negative flags as appropriate.
 func (cpu *CPU) inx() {
 	cpu.registerX += uint8(1)
-	cpu.updateZeroAndNegativeFlags(cpu.registerX)
+	cpu.setFlagZeroAndNegativeForResult(cpu.registerX)
 }
 
 // INY - Increment Y Register
 // Adds one to the Y register setting the zero and negative flags as appropriate.
 func (cpu *CPU) iny() {
 	cpu.registerY += uint8(1)
-	cpu.updateZeroAndNegativeFlags(cpu.registerY)
+	cpu.setFlagZeroAndNegativeForResult(cpu.registerY)
 }
 
 // LDA - Load Accumulator
@@ -133,7 +157,7 @@ func (cpu *CPU) lda(mode AddressingMode) {
 	addr := cpu.getOperandAddress(mode)
 	value := cpu.memRead(addr)
 	cpu.registerA = value
-	cpu.updateZeroAndNegativeFlags(cpu.registerA)
+	cpu.setFlagZeroAndNegativeForResult(cpu.registerA)
 }
 
 // LDX - Load X Register
@@ -142,7 +166,7 @@ func (cpu *CPU) ldx(mode AddressingMode) {
 	addr := cpu.getOperandAddress(mode)
 	value := cpu.memRead(addr)
 	cpu.registerX = value
-	cpu.updateZeroAndNegativeFlags(cpu.registerX)
+	cpu.setFlagZeroAndNegativeForResult(cpu.registerX)
 }
 
 // LDX - Load Y Register
@@ -151,7 +175,7 @@ func (cpu *CPU) ldy(mode AddressingMode) {
 	addr := cpu.getOperandAddress(mode)
 	value := cpu.memRead(addr)
 	cpu.registerY = value
-	cpu.updateZeroAndNegativeFlags(cpu.registerY)
+	cpu.setFlagZeroAndNegativeForResult(cpu.registerY)
 }
 
 // NOP - No Operation
@@ -185,7 +209,7 @@ func (cpu *CPU) sty(mode AddressingMode) {
 // the zero and negative flags as appropriate.
 func (cpu *CPU) tax() {
 	cpu.registerX = cpu.registerA
-	cpu.updateZeroAndNegativeFlags(cpu.registerX)
+	cpu.setFlagZeroAndNegativeForResult(cpu.registerX)
 }
 
 // TAY - Transfer Accumulator to Y
@@ -193,23 +217,7 @@ func (cpu *CPU) tax() {
 // the zero and negative flags as appropriate.
 func (cpu *CPU) tay() {
 	cpu.registerY = cpu.registerA
-	cpu.updateZeroAndNegativeFlags(cpu.registerY)
-}
-
-func (cpu *CPU) updateZeroAndNegativeFlags(result uint8) {
-	// If the register is zero set the zero flag
-	if result == 0 {
-		cpu.status = cpu.status | 0b0000_0010
-	} else {
-		cpu.status = cpu.status | 0b1111_1101
-	}
-
-	// If the register is negative set the negative flag
-	if result&0b1000_0000 != 0 {
-		cpu.status = cpu.status | 0b1000_0000
-	} else {
-		cpu.status = cpu.status & 0b0111_1111
-	}
+	cpu.setFlagZeroAndNegativeForResult(cpu.registerY)
 }
 
 func (cpu *CPU) getOperandAddress(mode AddressingMode) uint16 {
@@ -255,27 +263,6 @@ func (cpu *CPU) getOperandAddress(mode AddressingMode) uint16 {
 	}
 }
 
-func (cpu *CPU) memRead(addr uint16) uint8 {
-	return cpu.memory[addr]
-}
-
-func (cpu *CPU) memWrite(addr uint16, data uint8) {
-	cpu.memory[addr] = data
-}
-
-func (cpu *CPU) memReadUInt16(pos uint16) uint16 {
-	lo := uint16(cpu.memRead(pos))
-	hi := uint16(cpu.memRead(pos + 1))
-	return (hi << 8) | (lo)
-}
-
-func (cpu *CPU) memWriteUInt16(pos uint16, data uint16) {
-	hi := uint8(data >> 8)
-	lo := uint8(data & 0xff)
-	cpu.memWrite(pos, lo)
-	cpu.memWrite(pos+1, hi)
-}
-
 func (cpu *CPU) reset() {
 	cpu.registerA = 0
 	cpu.registerX = 0
@@ -306,67 +293,73 @@ func (cpu *CPU) run() {
 			panic(fmt.Sprintf("Could not locate opcode in opcode table: 0x%x\n", code))
 		}
 
-		switch code {
+		switch opcode.Name {
+		// ADC
+		case "ADC":
+			cpu.adc(opcode.AddressingMode)
+		// AND
+		case "AND":
+			cpu.and(opcode.AddressingMode)
 		// BRK
-		case 0x00:
+		case "BRK":
 			cpu.brk()
 			return
 		// CLC
-		case 0x18:
+		case "CLC":
 			cpu.clc()
 		// CLD
-		case 0xD8:
+		case "CLD":
 			cpu.cld()
 		// CLI
-		case 0x58:
+		case "CLI":
 			cpu.cli()
 		// CLV
-		case 0xB8:
+		case "CLV":
 			cpu.clv()
 		// CMP
-		case 0xC9, 0xC5, 0xD5, 0xCD, 0xDD, 0xD9, 0xC1, 0xD1:
+		case "CMP":
 			cpu.cmp(opcode.AddressingMode)
 		// CPX
-		case 0xE0, 0xE4, 0xEC:
+		case "CPX":
 			cpu.cpx(opcode.AddressingMode)
 		// CPY
-		case 0xC0, 0xC4, 0xCC:
+		case "CPY":
 			cpu.cpy(opcode.AddressingMode)
 		// INC
-		case 0xE6, 0xF6, 0xEE, 0xFE:
+		case "INC":
 			cpu.inc(opcode.AddressingMode)
 		// INX
-		case 0xE8:
+		case "INX":
 			cpu.inx()
 		// INY
-		case 0xC8:
+		case "INY":
 			cpu.iny()
 		// LDA
-		case 0xA9, 0xA5, 0xB5, 0xAD, 0xBD, 0xB9, 0xA1, 0xB1:
+		case "LDA":
 			cpu.lda(opcode.AddressingMode)
 		// LDX
-		case 0xA2, 0xA6, 0xB6, 0xAE, 0xBE:
+		case "LDX":
 			cpu.ldx(opcode.AddressingMode)
 		// LDY
-		case 0xA0, 0xA4, 0xB4, 0xAC, 0xBC:
+		case "LDY":
 			cpu.ldy(opcode.AddressingMode)
 		// NOP
-		case 0xEA:
+		case "NOP":
 			cpu.nop()
 		// STA
-		case 0x85, 0x95, 0x8D, 0x9D, 0x99, 0x81, 0x91:
+		case "STA":
 			cpu.sta(opcode.AddressingMode)
 		// STX
-		case 0x86, 0x96, 0x8E:
+		case "STX":
 			cpu.stx(opcode.AddressingMode)
 		// STY
-		case 0x84, 0x94, 0x8C:
+		case "STY":
 			cpu.sty(opcode.AddressingMode)
 		// TAX
-		case 0xAA:
+		case "TAX":
 			cpu.tax()
 		// TAY
-		case 0xA8:
+		case "TAY":
 			cpu.tay()
 		default:
 			panic(fmt.Sprintf("Unsupported opcode: 0x%x\n", opcode))

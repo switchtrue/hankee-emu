@@ -6,50 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Test that the zero flag is set when the value in register a is zero
-func Test_Flags_ZeroFlag_Set(t *testing.T) {
-	cpu := NewCPU()
-	cpu.updateZeroAndNegativeFlags(0)
-	assertZeroFlagSet(t, cpu.status)
-}
-
-// Test that the zero flag is not set when the value in register a is not zero
-func Test_Flags_ZeroFlag_NotSet(t *testing.T) {
-	cpu := NewCPU()
-	cpu.updateZeroAndNegativeFlags(1)
-	assertZeroFlagNotSet(t, cpu.status)
-}
-
-// Test that the negative flag is set when the value in register a is negative
-func Test_Flags_NegativeFlag_Set(t *testing.T) {
-	cpu := NewCPU()
-	cpu.updateZeroAndNegativeFlags(0xff)
-	assertNegativeFlagSet(t, cpu.status)
-}
-
-// Test that the negative flag is not set when the value in register a is positive
-func Test_Flags_NegativeFlag_NotSet(t *testing.T) {
-	cpu := NewCPU()
-	cpu.updateZeroAndNegativeFlags(1)
-	assertNegativeFlagNotSet(t, cpu.status)
-}
-
-func assertNegativeFlagSet(t *testing.T, status uint8) {
-	assert.Equal(t, uint8(0b1000_0000), status&0b1000_0000, "")
-}
-
-func assertNegativeFlagNotSet(t *testing.T, status uint8) {
-	assert.Equal(t, uint8(0b00), status&0b1000_0000, "")
-}
-
-func assertZeroFlagSet(t *testing.T, status uint8) {
-	assert.Equal(t, uint8(0b10), status&0b0000_0010, "")
-}
-
-func assertZeroFlagNotSet(t *testing.T, status uint8) {
-	assert.Equal(t, uint8(0b00), status&0b0000_0010, "")
-}
-
 // Test the 0xa9 immediate load opcode by loading 0x05 into register a and checking it's there.
 // Also checks that the zero flag and negative flags are both not set
 func Test_0xa9_LDA_Immediate(t *testing.T) {
